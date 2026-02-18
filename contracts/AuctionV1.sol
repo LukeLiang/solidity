@@ -3,8 +3,11 @@ pragma solidity ^0.8.27;
 
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
-contract Auction {
+/// @title AuctionV1 — 可升级版本的 NFT 英式拍卖合约
+/// @notice 使用 OpenZeppelin v5 透明代理模式，通过 initialize 替代 constructor
+contract AuctionV1 is Initializable {
 
     uint256 internal constant MINVALUE = 10 ** 12; // 0.000001 USD
     uint internal constant MINBIDRATE = 500; // 5%
@@ -21,21 +24,19 @@ contract Auction {
     uint256 internal constant FEE_RATE_TIER3 = 200;   // 2%
     uint256 internal constant FEE_RATE_TIER4 = 100;   // 1%
 
+    // ===== 存储槽顺序与 Auction.sol 完全一致 =====
+    // slot 0: dataFeed
     AggregatorV3Interface internal dataFeed;
+    // slot 1: owner
     address public owner;
+    // slot 2: accumulatedFees
     uint256 public accumulatedFees;
-
-    constructor(address priceFeed) {
-        dataFeed = AggregatorV3Interface(priceFeed);
-        owner = msg.sender;
-    }
-
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can call this function");
-        _;
-    }
-
+    // slot 3: auctionCounter
     uint256 private auctionCounter;
+    // slot 4: pendingReturns mapping
+    mapping (uint256 => mapping (address => uint256)) public pendingReturns;
+    // slot 5: auctionItems mapping
+    mapping (uint256 => AuctionItem) public auctionItems;
 
     struct AuctionItem {
         address seller; // 卖家地址
@@ -49,32 +50,35 @@ contract Auction {
         bool active; // 竞拍是否活跃
     }
 
-    // 记录每个竞拍项下每个地址的待退还金额
-    mapping (uint256 => mapping (address => uint256)) public pendingReturns;
-
-    // 记录所有竞拍项
-    mapping (uint256 => AuctionItem) public auctionItems;
-
     event CreateAuction(uint256 indexed auctionId, address indexed seller, address indexed tokenContract, uint256 tokenId, uint256 startingBid, uint256 endTime);
-
     event PlaceBid(uint256 indexed auctionId, address indexed bidder, uint256 amount);
-
     event EndAuction(uint256 indexed auctionId, address indexed winner, uint256 amount);
-
     event WithdrawPendingReturn(uint256 indexed auctionId, address indexed bidder, uint256 amount);
-
     event CancelAuction(uint256 indexed auctionId, address indexed seller);
-
     event FeeCollected(uint256 indexed auctionId, uint256 feeAmount, uint256 feeRate);
-
     event FeesWithdrawn(address indexed to, uint256 amount);
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address priceFeed) public initializer {
+        dataFeed = AggregatorV3Interface(priceFeed);
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
 
     function createAuctionItem(
         address tokenContract,
         uint256 tokenId,
         uint256 startingBid,
         uint256 endTime
-    ) external returns (uint256) {
+    ) public virtual returns (uint256) {
         require(endTime > block.timestamp, "End time must be in the future");
         require(convertEthToUsd(startingBid) >= MINVALUE, "Bid price must be at least 0.000001 USD");
         require(tokenContract != address(0), "Invalid token contract address");
@@ -105,7 +109,7 @@ contract Auction {
         return auctionId;
     }
 
-    function placeBid(uint256 auctionId) external payable {
+    function placeBid(uint256 auctionId) public virtual payable {
         AuctionItem storage item = auctionItems[auctionId];
         require(item.active, "Auction is not active");
         require(block.timestamp < item.endTime, "Auction has ended");
@@ -165,23 +169,16 @@ contract Auction {
         emit CancelAuction(auctionId, msg.sender);
     }
 
-
-
-
     function getChainlinkDataFeedLatestAnswer() public view returns (int256) {
-    // prettier-ignore
-    (
-      /* uint80 roundId */
-      ,
-      int256 answer,
-      /*uint256 startedAt*/
-      ,
-      /*uint256 updatedAt*/
-      ,
-      /*uint80 answeredInRound*/
-    ) = dataFeed.latestRoundData();
-    return answer;
-  }
+        (
+            /* uint80 roundId */,
+            int256 answer,
+            /*uint256 startedAt*/,
+            /*uint256 updatedAt*/,
+            /*uint80 answeredInRound*/
+        ) = dataFeed.latestRoundData();
+        return answer;
+    }
 
     function getLatestPrice() public view returns (uint256) {
         int256 price = getChainlinkDataFeedLatestAnswer();
@@ -235,5 +232,4 @@ contract Auction {
         require(newOwner != address(0), "Invalid new owner address");
         owner = newOwner;
     }
-
 }
