@@ -14,7 +14,7 @@ export default defineConfig({
   networks: {
     sepolia: {
       type: "http",
-      url: process.env.SEPOLIA_RPC_URL,
+      url: process.env.SEPOLIA_RPC_URL!,
       chainId: 11155111,
       timeout: 200000,
       accounts: [
@@ -22,7 +22,7 @@ export default defineConfig({
         process.env.PRIVATE_KEY_SELLER,
         process.env.PRIVATE_KEY_BIDDER1,
         process.env.PRIVATE_KEY_BIDDER2,
-      ].filter(Boolean),
+      ].filter((key): key is string => Boolean(key)),
     },
   },
 });

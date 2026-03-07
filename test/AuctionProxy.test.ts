@@ -1,50 +1,74 @@
 import { expect } from "chai";
 import { network } from "hardhat";
+import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
+import type {
+  AuctionV1,
+  AuctionV2,
+  AuctionToken,
+  MockV3Aggregator,
+  AuctionProxyAdmin,
+  AuctionTransparentProxy,
+} from "../types/ethers-contracts/index.js";
+
 
 const { ethers, networkHelpers } = await network.connect();
 
 // ETH/USD 价格：3000 USD，Chainlink 使用 8 位小数
-const INITIAL_ETH_PRICE = 3000_0000_0000n; // 3000e8
-const DECIMALS = 8;
+const INITIAL_ETH_PRICE: bigint = 3000_0000_0000n; // 3000e8
+const DECIMALS: number = 8;
 
 // ============================================================
 // 辅助函数：从代理部署收据的 AdminChanged 事件中读取 ProxyAdmin 地址
 // OZ v5 TransparentUpgradeableProxy 构造函数发出：
 // AdminChanged(address(0), proxyAdminAddress)
 // ============================================================
-async function getProxyAdminAddress(proxyContract) {
-  const receipt = await proxyContract.deploymentTransaction().wait();
+async function getProxyAdminAddress(proxyContract: AuctionTransparentProxy): Promise<string> {
+  const receipt = await proxyContract.deploymentTransaction()!.wait();
   const iface = new ethers.Interface([
     "event AdminChanged(address previousAdmin, address newAdmin)",
   ]);
-  for (const log of receipt.logs) {
+  for (const log of receipt!.logs) {
     try {
-      const parsed = iface.parseLog(log);
+      const parsed = iface.parseLog(log as unknown as { topics: string[]; data: string });
       if (parsed && parsed.name === "AdminChanged") {
-        return parsed.args.newAdmin;
+        return parsed.args.newAdmin as string;
       }
     } catch {}
   }
   throw new Error("AdminChanged event not found in deployment receipt");
 }
 
+// 部署代理 Fixture 返回类型
+interface DeployProxyFixtureResult {
+  auction: AuctionV1;
+  nft: AuctionToken;
+  mockPriceFeed: MockV3Aggregator;
+  proxyContract: AuctionTransparentProxy;
+  proxyAdmin: AuctionProxyAdmin;
+  auctionV1Impl: AuctionV1;
+  owner: HardhatEthersSigner;
+  seller: HardhatEthersSigner;
+  bidder1: HardhatEthersSigner;
+  bidder2: HardhatEthersSigner;
+}
+
 // ============================================================
 // Fixture 1：部署 AuctionV1 + 透明代理（未升级）
 // ============================================================
-async function deployProxyFixture() {
+async function deployProxyFixture(): Promise<DeployProxyFixtureResult> {
   const [owner, seller, bidder1, bidder2] = await ethers.getSigners();
 
   // 部署 Chainlink 价格预言机 Mock
   const mockPriceFeed = await ethers.deployContract("MockV3Aggregator", [
     DECIMALS,
     INITIAL_ETH_PRICE,
-  ]);
+  ]) as unknown as MockV3Aggregator;
 
   // 部署 AuctionToken NFT 合约
-  const nft = await ethers.deployContract("AuctionToken", [owner.address]);
+  const nft = await ethers.deployContract("AuctionToken", [owner.address]) as unknown as AuctionToken;
 
   // 部署 V1 实现合约（构造函数调用 _disableInitializers）
-  const auctionV1Impl = await ethers.deployContract("AuctionV1");
+  const auctionV1Impl = await ethers.deployContract("AuctionV1") as unknown as AuctionV1;
 
   // 编码 initialize 调用数据
   const v1Iface = (await ethers.getContractFactory("AuctionV1")).interface;
@@ -57,14 +81,14 @@ async function deployProxyFixture() {
   const proxyContract = await ethers.deployContract(
     "AuctionTransparentProxy",
     [await auctionV1Impl.getAddress(), owner.address, initData]
-  );
+  ) as unknown as AuctionTransparentProxy;
 
   const proxyAddress = await proxyContract.getAddress();
   const proxyAdminAddress = await getProxyAdminAddress(proxyContract);
-  const proxyAdmin = await ethers.getContractAt("AuctionProxyAdmin", proxyAdminAddress);
+  const proxyAdmin = await ethers.getContractAt("AuctionProxyAdmin", proxyAdminAddress) as unknown as AuctionProxyAdmin;
 
   // 将代理地址包装为 AuctionV1 接口，用于与代理交互
-  const auction = await ethers.getContractAt("AuctionV1", proxyAddress);
+  const auction = await ethers.getContractAt("AuctionV1", proxyAddress) as unknown as AuctionV1;
 
   return {
     auction,
@@ -80,18 +104,34 @@ async function deployProxyFixture() {
   };
 }
 
+// 升级 Fixture 返回类型
+interface DeployAndUpgradeFixtureResult {
+  auctionV2: AuctionV2;
+  nft: AuctionToken;
+  mockPriceFeed: MockV3Aggregator;
+  proxyContract: AuctionTransparentProxy;
+  proxyAdmin: AuctionProxyAdmin;
+  auctionV1Impl: AuctionV1;
+  auctionV2Impl: AuctionV2;
+  owner: HardhatEthersSigner;
+  seller: HardhatEthersSigner;
+  bidder1: HardhatEthersSigner;
+  bidder2: HardhatEthersSigner;
+  endTime: number;
+}
+
 // ============================================================
 // Fixture 2：部署 V1 + 代理，写入拍卖数据，再升级至 V2
 // ============================================================
-async function deployAndUpgradeFixture() {
+async function deployAndUpgradeFixture(): Promise<DeployAndUpgradeFixtureResult> {
   const [owner, seller, bidder1, bidder2] = await ethers.getSigners();
 
   const mockPriceFeed = await ethers.deployContract("MockV3Aggregator", [
     DECIMALS,
     INITIAL_ETH_PRICE,
-  ]);
-  const nft = await ethers.deployContract("AuctionToken", [owner.address]);
-  const auctionV1Impl = await ethers.deployContract("AuctionV1");
+  ]) as unknown as MockV3Aggregator;
+  const nft = await ethers.deployContract("AuctionToken", [owner.address]) as unknown as AuctionToken;
+  const auctionV1Impl = await ethers.deployContract("AuctionV1") as unknown as AuctionV1;
 
   const v1Iface = (await ethers.getContractFactory("AuctionV1")).interface;
   const initData = v1Iface.encodeFunctionData("initialize", [
@@ -101,12 +141,12 @@ async function deployAndUpgradeFixture() {
   const proxyContract = await ethers.deployContract(
     "AuctionTransparentProxy",
     [await auctionV1Impl.getAddress(), owner.address, initData]
-  );
+  ) as unknown as AuctionTransparentProxy;
 
   const proxyAddress = await proxyContract.getAddress();
   const proxyAdminAddress = await getProxyAdminAddress(proxyContract);
-  const proxyAdmin = await ethers.getContractAt("AuctionProxyAdmin", proxyAdminAddress);
-  const auction = await ethers.getContractAt("AuctionV1", proxyAddress);
+  const proxyAdmin = await ethers.getContractAt("AuctionProxyAdmin", proxyAdminAddress) as unknown as AuctionProxyAdmin;
+  const auction = await ethers.getContractAt("AuctionV1", proxyAddress) as unknown as AuctionV1;
 
   // 在升级前写入拍卖状态，用于验证升级后数据保持不变
   await nft.connect(owner).safeMint(seller.address, "https://example.com/nft/0");
@@ -126,7 +166,7 @@ async function deployAndUpgradeFixture() {
   await auction.connect(bidder2).placeBid(0n, { value: ethers.parseEther("0.5") });
 
   // ---- 升级至 V2 ----
-  const auctionV2Impl = await ethers.deployContract("AuctionV2");
+  const auctionV2Impl = await ethers.deployContract("AuctionV2") as unknown as AuctionV2;
   const v2Iface = (await ethers.getContractFactory("AuctionV2")).interface;
   const initV2Data = v2Iface.encodeFunctionData("initializeV2", []);
   await proxyAdmin
@@ -134,7 +174,7 @@ async function deployAndUpgradeFixture() {
     .upgradeAndCall(proxyAddress, await auctionV2Impl.getAddress(), initV2Data);
 
   // 将代理地址包装为 AuctionV2 接口
-  const auctionV2 = await ethers.getContractAt("AuctionV2", proxyAddress);
+  const auctionV2 = await ethers.getContractAt("AuctionV2", proxyAddress) as unknown as AuctionV2;
 
   return {
     auctionV2,

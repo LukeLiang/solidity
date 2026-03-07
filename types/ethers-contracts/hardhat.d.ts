@@ -14,24 +14,32 @@ declare module "@nomicfoundation/hardhat-ethers/types" {
 getContractFactory(name: 'AuctionToken', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.AuctionToken__factory>
 getContractFactory(name: 'AuctionV1', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.AuctionV1__factory>
 getContractFactory(name: 'AuctionV2', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.AuctionV2__factory>
+getContractFactory(name: 'AuctionProxyAdmin', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.AuctionProxyAdmin__factory>
+getContractFactory(name: 'AuctionTransparentProxy', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.AuctionTransparentProxy__factory>
 getContractFactory(name: 'MockV3Aggregator', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.MockV3Aggregator__factory>
 
   getContractAt(name: 'Auction', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.Auction>
 getContractAt(name: 'AuctionToken', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.AuctionToken>
 getContractAt(name: 'AuctionV1', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.AuctionV1>
 getContractAt(name: 'AuctionV2', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.AuctionV2>
+getContractAt(name: 'AuctionProxyAdmin', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.AuctionProxyAdmin>
+getContractAt(name: 'AuctionTransparentProxy', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.AuctionTransparentProxy>
 getContractAt(name: 'MockV3Aggregator', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.MockV3Aggregator>
 
   deployContract(name: 'Auction', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.Auction>
 deployContract(name: 'AuctionToken', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.AuctionToken>
 deployContract(name: 'AuctionV1', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.AuctionV1>
 deployContract(name: 'AuctionV2', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.AuctionV2>
+deployContract(name: 'AuctionProxyAdmin', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.AuctionProxyAdmin>
+deployContract(name: 'AuctionTransparentProxy', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.AuctionTransparentProxy>
 deployContract(name: 'MockV3Aggregator', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockV3Aggregator>
 
   deployContract(name: 'Auction', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.Auction>
 deployContract(name: 'AuctionToken', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.AuctionToken>
 deployContract(name: 'AuctionV1', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.AuctionV1>
 deployContract(name: 'AuctionV2', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.AuctionV2>
+deployContract(name: 'AuctionProxyAdmin', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.AuctionProxyAdmin>
+deployContract(name: 'AuctionTransparentProxy', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.AuctionTransparentProxy>
 deployContract(name: 'MockV3Aggregator', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockV3Aggregator>
 
     // default types

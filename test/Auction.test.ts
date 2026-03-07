@@ -1,34 +1,53 @@
 import { expect } from "chai";
 import { network } from "hardhat";
+import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
+import type { Auction, AuctionToken, MockV3Aggregator } from "../types/ethers-contracts/index.js";
+import type { ContractTransactionResponse } from "ethers";
 
 const { ethers, networkHelpers } = await network.connect();
 
 // ETH/USD 价格：3000 USD，Chainlink 使用 8 位小数
-const INITIAL_ETH_PRICE = 3000_0000_0000n; // 3000e8
-const DECIMALS = 8;
+const INITIAL_ETH_PRICE: bigint = 3000_0000_0000n; // 3000e8
+const DECIMALS: number = 8;
 
-async function deployFixture() {
+// 部署 Fixture 返回类型
+interface DeployFixtureResult {
+  auction: Auction;
+  nft: AuctionToken;
+  mockPriceFeed: MockV3Aggregator;
+  owner: HardhatEthersSigner;
+  seller: HardhatEthersSigner;
+  bidder1: HardhatEthersSigner;
+  bidder2: HardhatEthersSigner;
+}
+
+async function deployFixture(): Promise<DeployFixtureResult> {
   const [owner, seller, bidder1, bidder2] = await ethers.getSigners();
 
   // 部署 Chainlink mock（8 位小数，初始价格 3000 USD）
   const mockPriceFeed = await ethers.deployContract("MockV3Aggregator", [
     DECIMALS,
     INITIAL_ETH_PRICE,
-  ]);
+  ]) as unknown as MockV3Aggregator;
 
   // 部署 Auction 合约
   const auction = await ethers.deployContract("Auction", [
     await mockPriceFeed.getAddress(),
-  ]);
+  ]) as unknown as Auction;
 
   // 部署 AuctionToken（NFT）
-  const nft = await ethers.deployContract("AuctionToken", [owner.address]);
+  const nft = await ethers.deployContract("AuctionToken", [owner.address]) as unknown as AuctionToken;
 
   return { auction, nft, mockPriceFeed, owner, seller, bidder1, bidder2 };
 }
 
 // 辅助函数：铸造 NFT 并授权给 Auction 合约
-async function mintAndApprove(nft, auction, owner, seller) {
+async function mintAndApprove(
+  nft: AuctionToken,
+  auction: Auction,
+  owner: HardhatEthersSigner,
+  seller: HardhatEthersSigner
+): Promise<bigint> {
   const tokenId = 0n;
   await nft.connect(owner).safeMint(seller.address, "https://example.com/nft/0");
   await nft.connect(seller).approve(await auction.getAddress(), tokenId);
@@ -36,7 +55,17 @@ async function mintAndApprove(nft, auction, owner, seller) {
 }
 
 // 辅助函数：创建拍卖项（带默认参数）
-async function createDefaultAuction(auction, nft, seller) {
+interface CreateAuctionResult {
+  endTime: number;
+  startingBid: bigint;
+  tx: ContractTransactionResponse;
+}
+
+async function createDefaultAuction(
+  auction: Auction,
+  nft: AuctionToken,
+  seller: HardhatEthersSigner
+): Promise<CreateAuctionResult> {
   const endTime = (await networkHelpers.time.latest()) + 86400; // 1 天后
   const startingBid = ethers.parseEther("0.1");
   const tx = await auction
